@@ -47,4 +47,21 @@ app.get('/download/:filename', (req, res) => {
   }
 });
 
+app.delete('/delete/:filename', (req, res) => {
+  const filename = decodeURIComponent(req.params.filename);
+  const filePath = path.join(uploadDir, filename);
+
+  console.log('Delete request received for:', filename);
+  console.log('Resolved file path:', filePath);
+
+  if (fs.existsSync(filePath)) {
+    fs.unlinkSync(filePath);
+    console.log('File deleted:', filename);
+    res.json({ success: true, message: 'File deleted successfully' });
+  } else {
+    console.warn('File not found:', filename);
+    res.status(404).json({ success: false, message: 'File not found' });
+  }
+});
+
 app.listen(PORT, () => console.log(`Backend running on http://localhost:${PORT}`));

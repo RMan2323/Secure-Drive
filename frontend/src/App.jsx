@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
+import DriveLayout from "./components/driveLayout";
+import './App.css';
 
 function App() {
     //useState used to make React update the UI everytime an update happens
@@ -9,8 +11,7 @@ function App() {
 
     //fetch list of uploaded files
     useEffect(() => {
-        axios
-            .get("http://localhost:5000/files")
+        axios.get("http://localhost:5000/files")
             .then((res) => setFileList(res.data))
             .catch((err) => console.error(err));
     }, []);
@@ -31,8 +32,7 @@ function App() {
 
         const exportedKey = await crypto.subtle.exportKey("raw", key);
         const keyHex = Array.from(new Uint8Array(exportedKey))
-            .map((b) => b.toString(16).padStart(2, "0"))
-            .join("");
+            .map((b) => b.toString(16).padStart(2, "0")).join("");
 
         console.log("Encryption key (keep this safe):", keyHex);
         return { encryptedData: new Blob([iv, new Uint8Array(encrypted)]), keyHex };
@@ -56,7 +56,7 @@ function App() {
         }
     };
 
-    const handleDownload = async (filename) => {
+    const handleDownload = async (filename, decryptKey) => {
         try {
             const response = await axios.get(`http://localhost:5000/download/${filename}`, {
                 responseType: "arraybuffer",
@@ -90,42 +90,30 @@ function App() {
         }
     };
 
+    const handleDelete = async (filename) => {
+        if (!window.confirm(`Are you sure you want to delete "${filename}"?`)) return;
+        try {
+            await axios.delete(`http://localhost:5000/delete/${encodeURIComponent(filename)}`);
+            alert("File deleted successfully");
+            //refresh list
+            const res = await axios.get("http://localhost:5000/files");
+            setFileList(res.data);
+        } catch (err) {
+            console.error(err);
+            alert("Failed to delete file");
+        }
+    };
+
     return (
-        <div style={{ padding: 30, fontFamily: "Arial" }}>
-            <h2>Secure Drive</h2>
-
-            {/* upload */}
-            <div style={{ marginBottom: 20 }}>
-                <input type="file" onChange={handleFileChange} />
-                <button onClick={handleUpload} style={{ marginLeft: 10 }}>
-                    Encrypt & Upload
-                </button>
-            </div>
-
-            {/* download */}
-            <div style={{ marginBottom: 20 }}>
-                <input
-                    type="text"
-                    placeholder="Enter key to decrypt"
-                    value={decryptKey}
-                    onChange={(e) => setDecryptKey(e.target.value)}
-                    style={{ width: 300 }}
-                />
-            </div>
-
-            {/* file list */}
-            <h3>Encrypted Files</h3>
-            <ul>
-                {fileList.map((file, idx) => (
-                    <li key={idx}>
-                        {file}
-                        <button style={{ marginLeft: 10 }} onClick={() => handleDownload(file)}>
-                            Download & Decrypt
-                        </button>
-                    </li>
-                ))}
-            </ul>
-        </div>
+        <DriveLayout
+            handleFileChange={(e) => setSelectedFile(e.target.files[0])}
+            handleUpload={handleUpload}
+            decryptKey={decryptKey}
+            setDecryptKey={setDecryptKey}
+            fileList={fileList}
+            handleDownload={handleDownload}
+            handleDelete={handleDelete}
+        />
     );
 }
 

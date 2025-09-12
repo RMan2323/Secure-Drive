@@ -1,42 +1,176 @@
-#root {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 2rem;
-  text-align: center;
+body {
+    background-color: #1e1e2f;
+    color: #e0e0e0;
 }
 
-.logo {
-  height: 6em;
-  padding: 1.5em;
-  will-change: filter;
-  transition: filter 300ms;
-}
-.logo:hover {
-  filter: drop-shadow(0 0 2em #646cffaa);
-}
-.logo.react:hover {
-  filter: drop-shadow(0 0 2em #61dafbaa);
+.drive-container {
+    max-width: 700px;
+    margin: 40px auto;
+    padding: 20px;
+    font-family: 'Inter', Arial, sans-serif;
+    text-align: left;
 }
 
-@keyframes logo-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  a:nth-of-type(2) .logo {
-    animation: logo-spin infinite 20s linear;
-  }
+.title {
+    text-align: center;
+    margin-bottom: 30px;
+    color: #60a5fa;
+    font-weight: 700;
 }
 
 .card {
-  padding: 2em;
+    background: #2a2f45;
+    border: 1px solid #374151;
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 20px;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
 }
 
-.read-the-docs {
-  color: #888;
+.card h2 {
+    font-size: 1.2rem;
+    margin-bottom: 15px;
+    color: #f3f4f6;
+}
+
+.upload-section {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.file-input {
+    flex: 1;
+    padding: 8px;
+    border: 1px solid #4b5563;
+    border-radius: 6px;
+    background: #1f2937;
+    color: #e5e7eb;
+}
+
+.primary-btn,
+.secondary-btn {
+    border: none;
+    padding: 10px 16px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 600;
+    transition: background 0.2s, transform 0.2s;
+}
+
+.primary-btn {
+    background-color: #3b82f6;
+    color: white;
+}
+
+.primary-btn:hover {
+    background-color: #2563eb;
+    transform: scale(1.02);
+}
+
+.secondary-btn {
+    background-color: #374151;
+    color: #f9fafb;
+}
+
+.secondary-btn:hover {
+    background-color: #4b5563;
+    transform: scale(1.02);
+}
+
+.key-input {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #4b5563;
+    border-radius: 6px;
+    margin-top: 10px;
+    background-color: #1f2937;
+    color: #e5e7eb;
+}
+
+.file-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.file-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 0;
+    border-bottom: 1px solid #374151;
+}
+
+.filename {
+    font-family: monospace;
+    color: #cbd5e1;
+}
+
+.empty-msg {
+    color: #9ca3af;
+    font-style: italic;
+    text-align: center;
+}
+
+.popup-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 999;
+}
+
+.popup-card {
+    background: #2a2f45;
+    padding: 25px;
+    border-radius: 12px;
+    width: 320px;
+    text-align: center;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
+}
+
+.popup-card h3 {
+    margin-bottom: 15px;
+    color: #f3f4f6;
+}
+
+.popup-card .key-input {
+    width: -webkit-fill-available;
+    padding: 10px;
+    border-radius: 6px;
+    border: 1px solid #d1d5db;
+}
+
+.popup-buttons {
+    margin-top: 20px;
+    display: flex;
+    justify-content: space-between;
+}
+
+.delete-btn {
+    background-color: #ef4444;
+    color: white;
+    border: none;
+    padding: 10px 16px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 600;
+    transition: background 0.2s, transform 0.2s;
+    margin-left: 8px;
+}
+
+.delete-btn:hover {
+    background-color: #dc2626;
+    transform: scale(1.02);
+}
+
+.btn-group {
+    display: flex;
+    gap: 8px;
 }
