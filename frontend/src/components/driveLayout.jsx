@@ -63,7 +63,7 @@ const DriveLayout = ({
                                 <div className="btn-group">
                                     <button
                                         className="secondary-btn"
-                                        onClick={() => onDownloadClick(file)}
+                                        onClick={() => handleDownload(file)}
                                     >
                                         Download & Decrypt
                                     </button>
@@ -77,6 +77,7 @@ const DriveLayout = ({
                             </li>
                         ))}
                     </ul>
+
                 )}
             </div>
 

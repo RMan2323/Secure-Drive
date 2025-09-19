@@ -1,119 +1,29 @@
-import React, { useState, useEffect } from "react";
-import axios from "axios";
-import DriveLayout from "./components/driveLayout";
-import './App.css';
+import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import DrivePage from "./pages/DrivePage";
+import LoginPage from "./pages/LoginPage";
+import SignUpPage from "./pages/SignUpPage";
 
 function App() {
-    //useState used to make React update the UI everytime an update happens
-    const [selectedFile, setSelectedFile] = useState(null);
-    const [fileList, setFileList] = useState([]);
-    const [decryptKey, setDecryptKey] = useState("");
+    const [token, setToken] = useState(localStorage.getItem("authToken"));
 
-    //fetch list of uploaded files
     useEffect(() => {
-        axios.get("http://localhost:5000/files")
-            .then((res) => setFileList(res.data))
-            .catch((err) => console.error(err));
+        const handleStorage = () => setToken(localStorage.getItem("authToken"));
+        window.addEventListener("storage", handleStorage);
+        return () => window.removeEventListener("storage", handleStorage);
     }, []);
 
-    //setSelectedFile to the first file that is uploaded
-    const handleFileChange = (e) => setSelectedFile(e.target.files[0]);
-
-    //encrypt file using AES-GCM
-    const encryptFile = async (file) => {
-        const key = await crypto.subtle.generateKey(
-            { name: "AES-GCM", length: 256 },  //256 bits of key
-            true,
-            ["encrypt", "decrypt"]
-        );
-        const iv = crypto.getRandomValues(new Uint8Array(12));  //12 bytes of random data
-        const data = new Uint8Array(await file.arrayBuffer());
-        const encrypted = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, data);
-
-        const exportedKey = await crypto.subtle.exportKey("raw", key);
-        const keyHex = Array.from(new Uint8Array(exportedKey))
-            .map((b) => b.toString(16).padStart(2, "0")).join("");
-
-        console.log("Encryption key (keep this safe):", keyHex);
-        return { encryptedData: new Blob([iv, new Uint8Array(encrypted)]), keyHex };
-    };
-
-    const handleUpload = async () => {
-        if (!selectedFile) return alert("Please select a file");
-        try {
-            const { encryptedData } = await encryptFile(selectedFile);
-            const formData = new FormData();
-            formData.append("file", encryptedData, selectedFile.name + ".enc");
-            await axios.post("http://localhost:5000/upload", formData);
-            alert("File encrypted & uploaded");
-            //refresh list
-            const res = await axios.get("http://localhost:5000/files");
-            setFileList(res.data);
-            setSelectedFile(null);
-        } catch (err) {
-            console.error(err);
-            alert("Encryption or upload failed");
-        }
-    };
-
-    const handleDownload = async (filename, decryptKey) => {
-        try {
-            const response = await axios.get(`http://localhost:5000/download/${filename}`, {
-                responseType: "arraybuffer",
-            });
-            const encryptedData = new Uint8Array(response.data);
-
-            //first 12 bytes are IV
-            const iv = encryptedData.slice(0, 12);
-            const ciphertext = encryptedData.slice(12);
-
-            const keyBytes = new Uint8Array(
-                decryptKey.match(/.{1,2}/g).map((byte) => parseInt(byte, 16))
-            );
-            const key = await crypto.subtle.importKey(
-                "raw",
-                keyBytes,
-                { name: "AES-GCM" },
-                false,
-                ["decrypt"]
-            );
-
-            const decrypted = await crypto.subtle.decrypt({ name: "AES-GCM", iv }, key, ciphertext);
-            const blob = new Blob([decrypted]);
-            const link = document.createElement("a");
-            link.href = URL.createObjectURL(blob);
-            link.download = filename.replace(".enc", "");
-            link.click();
-        } catch (err) {
-            console.error(err);
-            alert("Decryption failed (wrong key?)");
-        }
-    };
-
-    const handleDelete = async (filename) => {
-        if (!window.confirm(`Are you sure you want to delete "${filename}"?`)) return;
-        try {
-            await axios.delete(`http://localhost:5000/delete/${encodeURIComponent(filename)}`);
-            alert("File deleted successfully");
-            //refresh list
-            const res = await axios.get("http://localhost:5000/files");
-            setFileList(res.data);
-        } catch (err) {
-            console.error(err);
-            alert("Failed to delete file");
-        }
-    };
-
     return (
-        <DriveLayout
-            handleFileChange={(e) => setSelectedFile(e.target.files[0])}
-            handleUpload={handleUpload}
-            decryptKey={decryptKey}
-            setDecryptKey={setDecryptKey}
-            fileList={fileList}
-            handleDownload={handleDownload}
-            handleDelete={handleDelete}
-        />
+        <Router>
+            <Routes>
+                <Route
+                    path="/"
+                    element={token ? <DrivePage /> : <Navigate to="/login" />}
+                />
+                <Route path="/login" element={<LoginPage setToken={setToken} />} />
+                <Route path="/signup" element={<SignUpPage />} />
+            </Routes>
+        </Router>
     );
 }
 
