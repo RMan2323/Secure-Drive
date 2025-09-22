@@ -40,19 +40,38 @@ function LoginPage({ setToken }) {
     }
 
     return (
-        <div className="auth-container">
-            <h2>Login</h2>
-            <LoginForm
-                email={email}
-                setEmail={setEmail}
-                password={password}
-                setPassword={setPassword}
-                handleLogin={handleLogin}
-            />
-            <p>
-                Don't have an account? <a href="/signup">Sign up</a>
-            </p>
-        </div>
+        <>
+            <header className="drive-header">
+                <div role="heading" aria-level="1" className="header-title">
+                    Secure Drive
+                </div>
+            </header>
+            <div className="auth-container">
+                <h2>Login</h2>
+                <form className="auth-form" onSubmit={handleLogin}>
+                    <input
+                        type="email"
+                        placeholder="Email"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        required
+                        autoComplete="username"
+                    />
+                    <input
+                        type="password"
+                        placeholder="Password"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        required
+                        autoComplete="current-password"
+                    />
+                    <button type="submit" className="primary-btn">Login</button>
+                </form>
+                <p className="auth-switch">
+                    Don't have an account? <a href="/signup">Sign Up</a>
+                </p>
+            </div>
+        </>
     );
 }
 

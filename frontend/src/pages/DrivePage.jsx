@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
+import { useNavigate } from "react-router-dom";
 import DriveLayout from "../components/DriveLayout";
 import '../App.css';
 
@@ -8,6 +9,8 @@ function DrivePage() {
     const [selectedFile, setSelectedFile] = useState(null);
     const [fileList, setFileList] = useState([]);
     const [decryptKey, setDecryptKey] = useState("");
+
+    const navigate = useNavigate();
 
     //fetch list of uploaded files
     useEffect(() => {
@@ -108,6 +111,15 @@ function DrivePage() {
         }
     };
 
+    const handleLogout = () => {
+        localStorage.removeItem("authToken");
+        localStorage.removeItem("masterKeyB64");
+        window.__MASTER_KEY = null;
+
+        alert("Logged out successfully!");
+        navigate("/login");
+    };
+
     return (
         <DriveLayout
             handleFileChange={(e) => setSelectedFile(e.target.files[0])}
@@ -117,6 +129,7 @@ function DrivePage() {
             fileList={fileList}
             handleDownload={handleDownload}
             handleDelete={handleDelete}
+            handleLogout={handleLogout}
         />
     );
 }
