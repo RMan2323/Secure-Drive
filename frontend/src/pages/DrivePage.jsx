@@ -23,7 +23,7 @@ function DrivePage() {
         const savedKey = localStorage.getItem("masterKeyB64");
         if (savedKey) {
             const raw = Uint8Array.from(atob(savedKey), c => c.charCodeAt(0));
-            crypto.subtle.importKey("raw", raw, "AES-GCM", true, ["encrypt", "decrypt"])
+            crypto.subtle.importKey("raw", raw, "AES-GCM", true, ["encrypt", "decrypt", "wrapKey", "unwrapKey"])
                 .then(key => window.__MASTER_KEY = key);
         }
     }, []);
@@ -31,33 +31,60 @@ function DrivePage() {
     //setSelectedFile to the first file that is uploaded
     const handleFileChange = (e) => setSelectedFile(e.target.files[0]);
 
-    //encrypt file using AES-GCM and master key
-    const encryptFile = async (file) => {
-        const masterKey = window.__MASTER_KEY;
-        if (!masterKey) {
-            alert("Missing master key — please log in again");
-            throw new Error("No master key");
-        }
-        const iv = crypto.getRandomValues(new Uint8Array(12));  //12 bytes of random data
-        const data = new Uint8Array(await file.arrayBuffer());
-        const encrypted = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, masterKey, data);
+    function abToB64(buf) {
+        return btoa(String.fromCharCode(...new Uint8Array(buf)));
+    }
+    function b64ToUint8(b64) {
+        return Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+    }
 
-        const exportedKey = await crypto.subtle.exportKey("raw", masterKey);
-        const keyHex = Array.from(new Uint8Array(exportedKey))
-            .map((b) => b.toString(16).padStart(2, "0")).join("");
-
-        console.log("Encryption key (keep this safe):", keyHex);
-        return { encryptedData: new Blob([iv, new Uint8Array(encrypted)]), keyHex };
-    };
-
+    //encrypt using per-file CEK and wrap CEK with masterKey
     const handleUpload = async () => {
         if (!selectedFile) return alert("Please select a file");
         try {
-            const { encryptedData } = await encryptFile(selectedFile);
+            const masterKey = window.__MASTER_KEY;
+            if (!masterKey) {
+                alert("Missing master key — please log in again");
+                throw new Error("No master key");
+            }
+
+            //generate CEK (file key)
+            const cek = await crypto.subtle.generateKey(
+                { name: "AES-GCM", length: 256 },
+                true,
+                ["encrypt", "decrypt", "wrapKey", "unwrapKey"]
+            );
+
+            //encrypt file with CEK
+            const ivFile = crypto.getRandomValues(new Uint8Array(12));
+            const data = new Uint8Array(await selectedFile.arrayBuffer());
+            const ciphertext = await crypto.subtle.encrypt({ name: "AES-GCM", iv: ivFile }, cek, data);
+
+            //wrap CEK with masterKey
+            const wrapIv = crypto.getRandomValues(new Uint8Array(12));
+            const wrappedCek = await crypto.subtle.wrapKey("raw", cek, masterKey, { name: "AES-GCM", iv: wrapIv });
+
+            //prepare form data: file bytes (IV + ciphertext) and meta JSON with wrapped CEK + IV
+            //and prepend ivFile to ciphertext so server stores IV with ciphertext
+            const fileBlob = new Blob([ivFile, new Uint8Array(ciphertext)]);
+            const wrappedCekB64 = abToB64(wrappedCek);
+            const wrapIvB64 = abToB64(wrapIv.buffer);
+
+            const meta = {
+                wrappedCekB64,
+                wrapIvB64,
+            };
+
             const formData = new FormData();
-            formData.append("file", encryptedData, selectedFile.name + ".enc");
-            await axios.post("http://localhost:5000/upload", formData);
-            alert("File encrypted & uploaded");
+            formData.append("file", fileBlob, selectedFile.name + ".enc");
+            formData.append("meta", JSON.stringify(meta));
+
+            //upload
+            await axios.post("http://localhost:5000/upload", formData, {
+                headers: { "Content-Type": "multipart/form-data" },
+            });
+
+            alert("File encrypted & uploaded (CEK wrapped by master key)");
             //refresh list
             const res = await axios.get("http://localhost:5000/files");
             setFileList(res.data);
@@ -68,24 +95,46 @@ function DrivePage() {
         }
     };
 
-    const handleDownload = async (filename, decryptKey) => {
+    //download flow: fetch metadata, unwrap CEK, fetch file bytes, decrypt with CEK
+    const handleDownload = async (filename) => {
         try {
-            const response = await axios.get(`http://localhost:5000/download/${filename}`, {
-                responseType: "arraybuffer",
-            });
-            const encryptedData = new Uint8Array(response.data);
-
-            //first 12 bytes are IV
-            const iv = encryptedData.slice(0, 12);
-            const ciphertext = encryptedData.slice(12);
-
             const masterKey = window.__MASTER_KEY;
             if (!masterKey) {
                 alert("Missing master key — please log in again");
                 throw new Error("No master key");
             }
 
-            const decrypted = await crypto.subtle.decrypt({ name: "AES-GCM", iv }, masterKey, ciphertext);
+            //fetch metadata for the file (wrapped CEK + wrap IV)
+            const metaRes = await axios.get(`http://localhost:5000/api/meta/${encodeURIComponent(filename)}`);
+            const { wrappedCekB64, wrapIvB64 } = metaRes.data;
+            if (!wrappedCekB64 || !wrapIvB64) throw new Error("Missing file metadata");
+
+            const wrapped = b64ToUint8(wrappedCekB64).buffer;
+            const wrapIv = b64ToUint8(wrapIvB64);
+
+            //unwrap CEK using masterKey
+            const cek = await crypto.subtle.unwrapKey(
+                "raw",
+                wrapped,
+                masterKey,
+                { name: "AES-GCM", iv: wrapIv },
+                { name: "AES-GCM", length: 256 },
+                true,
+                ["decrypt"]
+            );
+
+            //fetch encrypted file bytes
+            const response = await axios.get(`http://localhost:5000/download/${encodeURIComponent(filename)}`, {
+                responseType: "arraybuffer",
+            });
+            const encryptedData = new Uint8Array(response.data);
+
+            //first 12 bytes are IV
+            const ivFile = encryptedData.slice(0, 12);
+            const ciphertext = encryptedData.slice(12);
+
+            //decrypt with CEK
+            const decrypted = await crypto.subtle.decrypt({ name: "AES-GCM", iv: ivFile }, cek, ciphertext);
             const blob = new Blob([decrypted]);
             const link = document.createElement("a");
             link.href = URL.createObjectURL(blob);
@@ -93,7 +142,7 @@ function DrivePage() {
             link.click();
         } catch (err) {
             console.error(err);
-            alert("Decryption failed (wrong key?)");
+            alert("Decryption failed (user not logged in?)");
         }
     };
 

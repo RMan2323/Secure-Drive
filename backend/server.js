@@ -13,11 +13,15 @@ const app = express();
 const PORT = 5000;
 
 const USERS_FILE = path.join(process.cwd(), 'storage', 'users.json');
+const FILES_META = path.join(process.cwd(), 'storage', 'files.json');
+
 if (!fs.existsSync(path.join(process.cwd(), 'storage'))) fs.mkdirSync(path.join(process.cwd(), 'storage'));
 if (!fs.existsSync(USERS_FILE)) fs.writeFileSync(USERS_FILE, JSON.stringify([]));
+if (!fs.existsSync(FILES_META)) fs.writeFileSync(FILES_META, JSON.stringify([]));
 
 //TODO configure cors properly
 app.use(cors());
+app.use(express.json());
 
 //making sure uploads folder exists
 const uploadDir = path.join(__dirname, 'uploads');
@@ -29,14 +33,74 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage });
 
-//routes
+function readSafeJSON(file) {
+    try {
+        const data = fs.readFileSync(file, 'utf-8');
+        if (!data.trim()) return [];
+        return JSON.parse(data);
+    } catch (err) {
+        console.warn(`Warning: could not parse ${path.basename(file)}, resetting.`, err);
+        fs.writeFileSync(file, JSON.stringify([]));
+        return [];
+    }
+}
+function writeSafeJSON(file, arr) {
+    fs.writeFileSync(file, JSON.stringify(arr, null, 2));
+}
+
+function readUsers() { return readSafeJSON(USERS_FILE); }
+function writeUsers(users) { writeSafeJSON(USERS_FILE, users); }
+function readFilesMeta() { return readSafeJSON(FILES_META); }
+function writeFilesMeta(arr) { writeSafeJSON(FILES_META, arr); }
+
 app.get('/', (req, res) => {
     res.send('Secure Drive backend running');
 });
 
+//upload with CEK metadata
 app.post('/upload', upload.single('file'), (req, res) => {
-    console.log('File uploaded:', req.file.originalname);
+    try {
+        if (!req.file) return res.status(400).json({ error: 'no file' });
+
+        //meta comes from multipart form field 'meta'
+        let meta = {};
+        try {
+            if (req.body.meta) meta = JSON.parse(req.body.meta);
+        } catch (e) {
+            console.warn('Invalid meta JSON', e);
+        }
+
+        //store meta for this filename
+        const filesMeta = readFilesMeta();
+        const filename = req.file.filename;
+        const filtered = filesMeta.filter(f => f.filename !== filename);
+        filtered.push({
+            filename,
+            wrappedCekB64: meta.wrappedCekB64 || null,
+            wrapIvB64: meta.wrapIvB64 || null,
+            uploadedAt: new Date().toISOString()
+        });
+        writeFilesMeta(filtered);
+
+        console.log('File uploaded:', filename, 'meta:', meta ? 'present' : 'none');
     res.json({ success: true });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'upload failed' });
+    }
+});
+
+//get metadata for a file
+app.get('/api/meta/:filename', (req, res) => {
+    const fname = req.params.filename;
+    const filesMeta = readFilesMeta();
+    const record = filesMeta.find(f => f.filename === fname);
+    if (!record) return res.status(404).json({ error: 'metadata not found' });
+    res.json({
+        wrappedCekB64: record.wrappedCekB64,
+        wrapIvB64: record.wrapIvB64,
+        uploadedAt: record.uploadedAt
+    });
 });
 
 app.get('/files', (req, res) => {
@@ -70,16 +134,8 @@ app.delete('/delete/:filename', (req, res) => {
     }
 });
 
-//helper to read/write users
-function readUsers() {
-    return JSON.parse(fs.readFileSync(USERS_FILE));
-}
-function writeUsers(users) {
-    fs.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2));
-}
-
 //register and store wrapped master key and salt for user
-app.post('/api/register', express.json(), (req, res) => {
+app.post('/api/register', (req, res) => {
     const { email, wrappedMasterKeyB64, ivB64, saltB64 } = req.body;
     if (!email || !wrappedMasterKeyB64 || !ivB64 || !saltB64) {
         return res.status(400).json({ error: 'missing' });
@@ -102,7 +158,7 @@ app.post('/api/register', express.json(), (req, res) => {
 });
 
 //get wrapped master key for login
-app.post('/api/get-wrapped-key', express.json(), (req, res) => {
+app.post('/api/get-wrapped-key', (req, res) => {
     const { email } = req.body;
     const users = readUsers();
     const user = users.find(u => u.email === email);
