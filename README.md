@@ -32,7 +32,7 @@ project/
 ### 1. Clone the repo
 ```
 git clone https://github.com/RMan2323/Secure-Drive
-cd project
+cd Secure-Drive
 ```
 ### 2. Set up backend
 ```
