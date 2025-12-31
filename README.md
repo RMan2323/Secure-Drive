@@ -14,17 +14,16 @@
 
 ## Project Structure
 ```
-project/
+Secure-Drive/
  ├─ backend/
  │   ├─ server.js
+ │   ├─ uploads/
  │   ├─ storage/
- │   │   ├─ uploads/
- │   │   └─ files.json
- │   └─ package.json
+ │   │   ├─ files.json
+ │   │   └─ users.json
  ├─ frontend/
+ │   ├─ index.html
  │   ├─ src/
- │   ├─ package.json
- │   └─ public/
  └─ README.md
 ```
 
@@ -45,7 +44,7 @@ node server.js
 ```
 cd frontend
 npm install
-npm start
+npm run dev
 ```
 
 ## Working Flow
