@@ -14,18 +14,82 @@ function DrivePage() {
 
     //fetch list of uploaded files
     useEffect(() => {
-        axios.get("http://localhost:5000/files")
+        axios.get("http://localhost:5000/files", {
+            headers: {
+                Authorization: localStorage.getItem("authToken")
+            }
+        })
             .then((res) => setFileList(res.data))
             .catch((err) => console.error(err));
     }, []);
 
-    useEffect(() => {
-        const savedKey = localStorage.getItem("masterKeyB64");
-        if (savedKey) {
-            const raw = Uint8Array.from(atob(savedKey), c => c.charCodeAt(0));
-            crypto.subtle.importKey("raw", raw, "AES-GCM", true, ["encrypt", "decrypt", "wrapKey", "unwrapKey"])
-                .then(key => window.__MASTER_KEY = key);
+    const fetchFiles = async () => {
+        try {
+            const masterKey = window.__MASTER_KEY;
+            if (!masterKey) return;
+
+            const res = await axios.get("http://localhost:5000/files", {
+                headers: {
+                    Authorization: localStorage.getItem("authToken")
+                }
+            });
+
+            const files = res.data;
+            const decryptedFiles = [];
+
+            for (const filename of files) {
+                const metaRes = await axios.get(
+                    `http://localhost:5000/api/meta/${encodeURIComponent(filename)}`,
+                    {
+                        headers: {
+                            Authorization: localStorage.getItem("authToken")
+                        }
+                    }
+                );
+
+                const {
+                    wrappedCekB64,
+                    wrapIvB64,
+                    encryptedFileNameB64,
+                    ivNameB64
+                } = metaRes.data;
+
+                const wrapped = b64ToUint8(wrappedCekB64).buffer;
+                const wrapIv = b64ToUint8(wrapIvB64);
+
+                const cek = await crypto.subtle.unwrapKey(
+                    "raw",
+                    wrapped,
+                    masterKey,
+                    { name: "AES-GCM", iv: wrapIv },
+                    { name: "AES-GCM", length: 256 },
+                    true,
+                    ["decrypt"]
+                );
+
+                const decryptedNameBuffer = await crypto.subtle.decrypt(
+                    { name: "AES-GCM", iv: b64ToUint8(ivNameB64) },
+                    cek,
+                    b64ToUint8(encryptedFileNameB64)
+                );
+
+                const decoder = new TextDecoder();
+                const originalName = decoder.decode(decryptedNameBuffer);
+
+                decryptedFiles.push({
+                    storageName: filename,
+                    displayName: originalName
+                });
+            }
+
+            setFileList(decryptedFiles);
+        } catch (err) {
+            console.error(err);
         }
+    };
+
+    useEffect(() => {
+        fetchFiles();
     }, []);
 
     //setSelectedFile to the first file that is uploaded
@@ -70,9 +134,25 @@ function DrivePage() {
             const wrappedCekB64 = abToB64(wrappedCek);
             const wrapIvB64 = abToB64(wrapIv.buffer);
 
+            const encoder = new TextEncoder();
+            const fileNameBytes = encoder.encode(selectedFile.name);
+
+            const ivName = crypto.getRandomValues(new Uint8Array(12));
+
+            const encryptedFileName = await crypto.subtle.encrypt(
+                { name: "AES-GCM", iv: ivName },
+                cek,
+                fileNameBytes
+            );
+
+            const encryptedFileNameB64 = abToB64(encryptedFileName);
+            const ivNameB64 = abToB64(ivName.buffer);
+
             const meta = {
                 wrappedCekB64,
                 wrapIvB64,
+                encryptedFileNameB64,
+                ivNameB64
             };
 
             const formData = new FormData();
@@ -81,13 +161,12 @@ function DrivePage() {
 
             //upload
             await axios.post("http://localhost:5000/upload", formData, {
-                headers: { "Content-Type": "multipart/form-data" },
+                headers: { "Content-Type": "multipart/form-data", Authorization: localStorage.getItem("authToken") },
             });
 
             alert("File encrypted & uploaded (CEK wrapped by master key)");
             //refresh list
-            const res = await axios.get("http://localhost:5000/files");
-            setFileList(res.data);
+            await fetchFiles();
             setSelectedFile(null);
         } catch (err) {
             console.error(err);
@@ -96,7 +175,7 @@ function DrivePage() {
     };
 
     //download flow: fetch metadata, unwrap CEK, fetch file bytes, decrypt with CEK
-    const handleDownload = async (filename) => {
+    const handleDownload = async (fileObj) => {
         try {
             const masterKey = window.__MASTER_KEY;
             if (!masterKey) {
@@ -104,15 +183,27 @@ function DrivePage() {
                 throw new Error("No master key");
             }
 
-            //fetch metadata for the file (wrapped CEK + wrap IV)
-            const metaRes = await axios.get(`http://localhost:5000/api/meta/${encodeURIComponent(filename)}`);
-            const { wrappedCekB64, wrapIvB64 } = metaRes.data;
-            if (!wrappedCekB64 || !wrapIvB64) throw new Error("Missing file metadata");
+            const filename = fileObj.storageName;
+
+            const metaRes = await axios.get(
+                `http://localhost:5000/api/meta/${encodeURIComponent(filename)}`,
+                {
+                    headers: {
+                        Authorization: localStorage.getItem("authToken")
+                    }
+                }
+            );
+
+            const {
+                wrappedCekB64,
+                wrapIvB64,
+                encryptedFileNameB64,
+                ivNameB64
+            } = metaRes.data;
 
             const wrapped = b64ToUint8(wrappedCekB64).buffer;
             const wrapIv = b64ToUint8(wrapIvB64);
 
-            //unwrap CEK using masterKey
             const cek = await crypto.subtle.unwrapKey(
                 "raw",
                 wrapped,
@@ -123,36 +214,61 @@ function DrivePage() {
                 ["decrypt"]
             );
 
-            //fetch encrypted file bytes
-            const response = await axios.get(`http://localhost:5000/download/${encodeURIComponent(filename)}`, {
-                responseType: "arraybuffer",
-            });
-            const encryptedData = new Uint8Array(response.data);
+            const response = await axios.get(
+                `http://localhost:5000/download/${encodeURIComponent(filename)}`,
+                {
+                    responseType: "arraybuffer",
+                    headers: {
+                        Authorization: localStorage.getItem("authToken")
+                    }
+                }
+            );
 
-            //first 12 bytes are IV
+            const encryptedData = new Uint8Array(response.data);
             const ivFile = encryptedData.slice(0, 12);
             const ciphertext = encryptedData.slice(12);
 
-            //decrypt with CEK
-            const decrypted = await crypto.subtle.decrypt({ name: "AES-GCM", iv: ivFile }, cek, ciphertext);
+            const decrypted = await crypto.subtle.decrypt(
+                { name: "AES-GCM", iv: ivFile },
+                cek,
+                ciphertext
+            );
+
+            const decryptedNameBuffer = await crypto.subtle.decrypt(
+                { name: "AES-GCM", iv: b64ToUint8(ivNameB64) },
+                cek,
+                b64ToUint8(encryptedFileNameB64)
+            );
+
+            const decoder = new TextDecoder();
+            const originalName = decoder.decode(decryptedNameBuffer);
+
             const blob = new Blob([decrypted]);
             const link = document.createElement("a");
             link.href = URL.createObjectURL(blob);
-            link.download = filename.replace(".enc", "");
+            link.download = originalName;
             link.click();
         } catch (err) {
             console.error(err);
-            alert("Decryption failed (user not logged in?)");
+            alert("Decryption failed");
         }
     };
 
     const handleDelete = async (filename) => {
         if (!window.confirm(`Are you sure you want to delete "${filename}"?`)) return;
         try {
-            await axios.delete(`http://localhost:5000/delete/${encodeURIComponent(filename)}`);
+            await axios.delete(`http://localhost:5000/delete/${encodeURIComponent(filename)}`, {
+                headers: {
+                    Authorization: localStorage.getItem("authToken")
+                }
+            });
             alert("File deleted successfully");
             //refresh list
-            const res = await axios.get("http://localhost:5000/files");
+            const res = await axios.get("http://localhost:5000/files", {
+                headers: {
+                    Authorization: localStorage.getItem("authToken")
+                }
+            });
             setFileList(res.data);
         } catch (err) {
             console.error(err);

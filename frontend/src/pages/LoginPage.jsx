@@ -12,26 +12,43 @@ function LoginPage({ setToken }) {
     async function handleLogin(e) {
         e.preventDefault();
         try {
-            const r = await axios.post("http://localhost:5000/api/get-wrapped-key", { email });
-            const { wrappedMasterKeyB64, ivB64, saltB64, token } = r.data;
+            //get wrapped master key + salt
+            const keyRes = await axios.post(
+                "http://localhost:5000/api/get-wrapped-key",
+                { email }
+            );
 
+            const { wrappedMasterKeyB64, ivB64, saltB64 } = keyRes.data;
+
+            //derive wrapping key from password
             const wrappingKey = await deriveWrappingKeyFromPassword(password, saltB64);
-            const masterKey = await unwrapMasterKey(wrappedMasterKeyB64, ivB64, wrappingKey);
+
+            //unwrap master key
+            const masterKey = await unwrapMasterKey(
+                wrappedMasterKeyB64,
+                ivB64,
+                wrappingKey
+            );
 
             window.__MASTER_KEY = masterKey;
 
-            localStorage.setItem("authToken", "dummy-session-token"); // TODO use JWT
-            setToken("dummy-session-token"); //update token state in App.jsx
+            //now authenticate and get session token
+            const loginRes = await axios.post(
+                "http://localhost:5000/api/login",
+                { email }
+            );
 
-            alert("Login successful — master key unwrapped!");
+            localStorage.setItem("authToken", loginRes.data.token);
+            setToken(loginRes.data.token);
 
-            //export and store master key in localStorage
+            //store master key
             const exportedKey = await crypto.subtle.exportKey("raw", masterKey);
             localStorage.setItem(
                 "masterKeyB64",
                 btoa(String.fromCharCode(...new Uint8Array(exportedKey)))
             );
 
+            alert("Login successful — master key unwrapped!");
             navigate("/");
         } catch (err) {
             console.error(err);

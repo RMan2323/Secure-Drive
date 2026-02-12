@@ -9,26 +9,10 @@ const DriveLayout = ({
     handleLogout
 }) => {
     const fileInputRef = useRef(null);
-    const [showPopup, setShowPopup] = useState(false);
-    const [decryptKey, setDecryptKey] = useState("");
-    const [selectedFile, setSelectedFile] = useState(null);
 
     const onUploadClick = async () => {
         await handleUpload();
         if (fileInputRef.current) fileInputRef.current.value = "";
-    };
-
-    const onDownloadClick = (filename) => {
-        setSelectedFile(filename);
-        setShowPopup(true);
-    };
-
-    const confirmDecryption = async () => {
-        if (!decryptKey) return alert("Please enter a decryption key");
-        await handleDownload(selectedFile, decryptKey);
-        setDecryptKey("");
-        setSelectedFile(null);
-        setShowPopup(false);
     };
 
     return (
@@ -66,9 +50,9 @@ const DriveLayout = ({
                         <p className="empty-msg">No files uploaded yet.</p>
                     ) : (
                         <ul className="file-list">
-                            {fileList.map((file, idx) => (
-                                <li key={idx} className="file-item">
-                                    <span className="filename">{file}</span>
+                            {fileList.map((file) => (
+                                <li key={file.storageName} className="file-item">
+                                    <span className="filename">{file.displayName}</span>
                                     <div className="btn-group">
                                         <button
                                             className="secondary-btn"
@@ -78,7 +62,7 @@ const DriveLayout = ({
                                         </button>
                                         <button
                                             className="delete-btn"
-                                            onClick={() => handleDelete(file)}
+                                            onClick={() => handleDelete(file.storageName)}
                                         >
                                             Delete
                                         </button>
@@ -86,40 +70,8 @@ const DriveLayout = ({
                                 </li>
                             ))}
                         </ul>
-
                     )}
                 </div>
-
-                {/* popup for decryption key */}
-                {showPopup && (
-                    <div className="popup-overlay">
-                        <div className="popup-card">
-                            <h3>Enter Decryption Key</h3>
-                            <input
-                                type="text"
-                                value={decryptKey}
-                                onChange={(e) => setDecryptKey(e.target.value)}
-                                placeholder="Paste your decryption key here"
-                                className="key-input"
-                            />
-                            <div className="popup-buttons">
-                                <button className="primary-btn" onClick={confirmDecryption}>
-                                    Decrypt
-                                </button>
-                                <button
-                                    className="secondary-btn"
-                                    onClick={() => {
-                                        setShowPopup(false);
-                                        setDecryptKey("");
-                                        setSelectedFile(null);
-                                    }}
-                                >
-                                    Cancel
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                )}
             </div>
         </>
     );

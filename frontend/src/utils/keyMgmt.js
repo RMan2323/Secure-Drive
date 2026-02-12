@@ -55,6 +55,6 @@ export async function unwrapMasterKey(wrappedMasterKeyB64, ivB64, wrappingKey) {
         { name: "AES-GCM", iv },
         { name: "AES-GCM", length: 256 },
         true,
-        ["encrypt", "decrypt"]
+        ["encrypt", "decrypt", "wrapKey", "unwrapKey"]
     );
 }
