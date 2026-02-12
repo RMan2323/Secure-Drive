@@ -2,7 +2,7 @@ import React from "react";
 
 function SignUpForm({ email, setEmail, password, setPassword, handleSignUp }) {
   return (
-    <form onSubmit={handleSignUp}>
+    <form className="auth-form" onSubmit={handleSignUp}>
       <input
         type="email"
         placeholder="Email"
@@ -17,7 +17,7 @@ function SignUpForm({ email, setEmail, password, setPassword, handleSignUp }) {
         onChange={(e) => setPassword(e.target.value)}
         required
       />
-      <button type="submit">Sign Up</button>
+      <button type="submit" className="primary-btn">Sign Up</button>
     </form>
   );
 }

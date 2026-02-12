@@ -40,6 +40,13 @@ function SignUpPage() {
     }
 
     return (
+        <>
+        <header className="drive-header">
+                <div role="heading" aria-level="1" className="header-title">
+                    Secure Drive
+                </div>
+            </header>
+
         <div className="auth-container">
             <h2>Sign Up</h2>
             <SignUpForm
@@ -53,6 +60,7 @@ function SignUpPage() {
                 Already have an account? <a href="/login">Login</a>
             </p>
         </div>
+        </>
     );
 }
 
