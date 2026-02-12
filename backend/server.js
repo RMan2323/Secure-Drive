@@ -5,13 +5,14 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import crypto from 'crypto';
+import jwt from "jsonwebtoken";
 
+const JWT_SECRET = "super_secret_key";  //TODO change in prod
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = 5000;
-const sessions = {};
 
 const USERS_FILE = path.join(process.cwd(), 'storage', 'users.json');
 const FILES_META = path.join(process.cwd(), 'storage', 'files.json');
@@ -25,14 +26,19 @@ app.use(cors());
 app.use(express.json());
 
 function authMiddleware(req, res, next) {
-    const token = req.headers.authorization;
+    const authHeader = req.headers.authorization;
 
-    if (!token || !sessions[token]) {
-        return res.status(401).json({ error: "Unauthorized" });
+    if (!authHeader) {
+        return res.status(401).json({ error: "No token provided" });
     }
 
-    req.userEmail = sessions[token];
-    next();
+    try {
+        const decoded = jwt.verify(authHeader, JWT_SECRET);
+        req.userEmail = decoded.email;
+        next();
+    } catch (err) {
+        return res.status(401).json({ error: "Invalid or expired token" });
+    }
 }
 
 //making sure uploads folder exists
@@ -226,8 +232,11 @@ app.post('/api/login', (req, res) => {
     }
 
     // generate session token
-    const token = crypto.randomBytes(32).toString("hex");
-    sessions[token] = email;
+    const token = jwt.sign(
+        { email },
+        JWT_SECRET,
+        { expiresIn: "1h" }
+    );
 
     res.json({ token });
 });
