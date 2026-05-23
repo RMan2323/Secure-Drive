@@ -179,11 +179,3 @@ This project does **not** currently protect against: client-side malware, phishi
 
 **Yashaswini L** — IIT Dharwad, CSE (cs23bt060@iitdh.ac.in)  
 **Raghuveer Verma** — IIT Dharwad, CSE
-
-*BTP Project, Department of Computer Science and Engineering, IIT Dharwad*
-
----
-
-## License
-
-MIT License — see `LICENSE` for details.
