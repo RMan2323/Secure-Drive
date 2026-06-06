@@ -1,4 +1,4 @@
-# 🔐 SecureDrive
+# SecureDrive
 
 > **Zero-knowledge cloud storage — the server never sees your files.**
 
@@ -138,7 +138,7 @@ npm run dev
 
 ## Current Limitations
 
-These are known limitations actively being addressed as part of the BTP research work:
+These are known limitations being addressed as part of the BTP research work:
 
 - User data stored in flat JSON files (no database)
 - No session management or JWT-based authentication
@@ -149,9 +149,9 @@ These are known limitations actively being addressed as part of the BTP research
 
 ---
 
-## Planned Research Extensions (BTP Scope)
+## Planned Extensions
 
-The following directions are being explored as part of the BTP at IIT Dharwad:
+The following directions are being explored:
 
 - **Database migration** — Replace JSON stores with MongoDB for persistent, scalable user and file metadata management
 - **Formal authentication** — JWT-based session management with secure token refresh
