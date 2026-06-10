@@ -1,3 +1,9 @@
+## [IMPORTANT]
+This repository is no longer under active development.
+
+Development has moved to:
+[github.com/nidhi-005/SecureDrive](https://github.com/nidhi-005/SecureDrive)
+
 # SecureDrive
 
 > **Zero-knowledge cloud storage — the server never sees your files.**
@@ -177,5 +183,5 @@ This project does **not** currently protect against: client-side malware, phishi
 
 ## Authors
 
-**Yashaswini L** — IIT Dharwad, CSE (cs23bt060@iitdh.ac.in)  
 **Raghuveer Verma** — IIT Dharwad, CSE
+**Yashaswini L** — IIT Dharwad, CSE (cs23bt060@iitdh.ac.in)  
